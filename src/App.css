@@ -1,0 +1,33 @@
+.app {
+  padding: 20px;
+}
+
+.pivot-control {
+  margin-bottom: 20px;
+}
+
+.droppable-area {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.field-item {
+  background-color: #f0f0f0;
+  padding: 5px;
+  border-radius: 5px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+table th, table td {
+  padding: 10px;
+  text-align: center;
+}
+
+table th {
+  background-color: #f4f4f4;
+}
