@@ -10,11 +10,39 @@ const CSVUploader = ({ onUpload }) => {
   const parseCSV = (text) => {
     const [headerLine, ...lines] = text.trim().split('\n');
     const headers = headerLine.split(',');
+  
+    // Iterate through each line and process the data
     return lines.map(line => {
       const values = line.split(',');
-      return headers.reduce((acc, h, i) => ({ ...acc, [h]: values[i] }), {});
+  
+      // Create a new object based on headers and values
+      const rowData = headers.reduce((acc, h, i) => {
+        const value = values[i];
+  
+        // Check if the value is a valid date and process the Year, Month, and Day
+        if (isValidDate(value)) {
+          const date = new Date(value);
+          acc[`${h}_Year`] = date.getFullYear();
+          acc[`${h}_Month`] = date.getMonth() + 1; // Month is 0-based
+          acc[`${h}_Day`] = date.getDate();
+        }
+        
+        // Keep the original date field
+        acc[h] = value;
+  
+        return acc;
+      }, {});
+  
+      return rowData;
     });
   };
+  
+  // Helper function to check if a value is a valid date
+  const isValidDate = (dateString) => {
+    const regex = /^\d{4}-\d{2}-\d{2}$/;  // Match format YYYY-MM-DD
+    return dateString.match(regex) !== null;
+  };
+  
 
   const handleChange = (e) => {
     const file = e.target.files[0];
