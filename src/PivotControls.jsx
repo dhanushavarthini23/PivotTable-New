@@ -120,6 +120,7 @@ const PivotControls = ({
               <option value="COUNT">COUNT</option>
               <option value="MIN">MIN</option>
               <option value="MAX">MAX</option>
+              <option value="MEDIAN">MEDIAN</option>
             </select>
             <span onClick={() => setMeasures(measures.filter((m) => m.field !== field))}>
               <FontAwesomeIcon icon={faTrashAlt} />
