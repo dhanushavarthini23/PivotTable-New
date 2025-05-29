@@ -8,10 +8,10 @@
   width: 300px;
   margin: 10px;
   height: auto; /* Let the container grow with content */
-  max-height: 100vh; /* Ensure the container doesn't exceed the viewport height */
+  max-height: 100vh; 
   display: flex;
   flex-direction: column;
-  justify-content: flex-start; /* Align items at the top */
+  justify-content: flex-start; 
   overflow-y: auto; /* Ensure the container can scroll vertically */
 }
 
@@ -32,8 +32,8 @@
   transition: background-color 0.3s ease;
   border-radius: 8px;
   background-color: #fff;
-  flex-grow: 1; /* Allow dropzone to take up remaining space */
-  overflow-y: auto; /* Enable scroll inside the dropzone if needed */
+  flex-grow: 1; 
+  overflow-y: auto; 
 }
 
 .dropzone:hover {
@@ -49,7 +49,7 @@
   padding: 0;
 }
 
-/* Draggable item style */
+
 .draggable-item {
   display: flex;
   justify-content: space-between;
@@ -68,7 +68,7 @@
   background-color: #f0f0f0;
 }
 
-/* Remove button (×) for row/column/measures removal */
+
 .draggable-item span {
   font-size: 16px;
   color: #d9534f;
@@ -79,7 +79,7 @@
   color: #c12e2a;
 }
 
-/* Select dropdown for aggregation */
+
 .agg-select {
   padding: 4px 8px;
   border: 1px solid #ccc;
@@ -90,11 +90,11 @@
   cursor: pointer;
 }
 
-/* Zones container for available fields */
+
 .zones-container {
   margin-top: 10px;
-  max-height: 200px; /* Set a max-height to ensure it doesn't take too much space */
-  overflow-y: auto; /* Enable scroll for available fields if needed */
+  max-height: 200px; 
+  overflow-y: auto; 
 }
 
 .zones-container h5 {
@@ -117,7 +117,7 @@
   border-color: #2196f3;
 }
 
-/* Special styling for the available fields and measures list */
+
 .available-fields-and-measures {
   max-height: 200px;
   overflow-y: auto;
@@ -144,7 +144,7 @@
   border-color: #2196f3;
 }
 
-/* Active/Focus state for draggable items */
+
 .zones-container .draggable-item:active {
   background-color: #c1e1fe;
   border-color: #1e88e5;
@@ -155,7 +155,7 @@
   border-color: #2196f3;
 }
 
-/* Style for the remove buttons (×) for measures in the dropzone */
+
 .dropzone .draggable-item span {
   margin-left: 8px;
   cursor: pointer;

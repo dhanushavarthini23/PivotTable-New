@@ -2,7 +2,6 @@ import React, { useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowsAltH, faPlus, faColumns, faTh } from '@fortawesome/free-solid-svg-icons';
 
-// Utility to calculate aggregations
 const calculate = (values, aggregation) => {
   const nums = values.map(Number).filter(v => !isNaN(v));
   if (!nums.length) return '';
@@ -24,15 +23,20 @@ const calculate = (values, aggregation) => {
   }
 };
 
-const getKey = (obj, fields) => fields.map(f => obj[f]).join(' | ');
+const getKeyParts = (obj, fields) => fields.map(f => obj[f]);
 
 const PivotTable = ({ data, rowFields, columnFields, measures }) => {
-  const { pivot, rowKeys, colKeys, columnTotals, rowTotals, grandTotals } = useMemo(() => {
+  const { pivot, rowKeyPartsList, colKeys, columnTotals, rowTotals, grandTotals } = useMemo(() => {
     const pivot = {};
+    const rowMap = new Map();
 
     data.forEach(row => {
-      const rowKey = getKey(row, rowFields);
-      const colKey = getKey(row, columnFields);
+      const rowKeyParts = getKeyParts(row, rowFields);
+      const rowKey = rowKeyParts.join('|');
+      const colKey = getKeyParts(row, columnFields).join('|');
+
+      if (!rowMap.has(rowKey)) rowMap.set(rowKey, rowKeyParts);
+
       if (!pivot[rowKey]) pivot[rowKey] = {};
       if (!pivot[rowKey][colKey]) pivot[rowKey][colKey] = {};
 
@@ -42,45 +46,82 @@ const PivotTable = ({ data, rowFields, columnFields, measures }) => {
       });
     });
 
-    const rowKeys = Object.keys(pivot).sort();
+    // Sort row keys hierarchically
+    const rowKeyPartsList = [...rowMap.values()].sort((a, b) => {
+      for (let i = 0; i < a.length; i++) {
+        const cmp = String(a[i]).localeCompare(String(b[i]));
+        if (cmp !== 0) return cmp;
+      }
+      return 0;
+    });
+
     const colKeySet = new Set();
-    rowKeys.forEach(rk => Object.keys(pivot[rk]).forEach(ck => colKeySet.add(ck)));
+    Object.values(pivot).forEach(cols => Object.keys(cols).forEach(k => colKeySet.add(k)));
     const colKeys = [...colKeySet].sort();
 
-    // Calculate column totals by aggregating all raw values from all rows for each column & measure
     const columnTotals = {};
     colKeys.forEach(col => {
       measures.forEach(({ field, aggregation }) => {
-        const allValues = rowKeys.flatMap(row => pivot[row]?.[col]?.[field] || []);
+        const allValues = rowKeyPartsList.flatMap(rowParts => pivot[rowParts.join('|')]?.[col]?.[field] || []);
         columnTotals[`${col}-${field}-${aggregation}`] = calculate(allValues, aggregation);
       });
     });
 
-    // Calculate row totals by aggregating all raw values from all columns for each row & measure
     const rowTotals = {};
-    rowKeys.forEach(row => {
+    rowKeyPartsList.forEach(rowParts => {
+      const rowKey = rowParts.join('|');
       measures.forEach(({ field, aggregation }) => {
-        const allValues = colKeys.flatMap(col => pivot[row]?.[col]?.[field] || []);
-        rowTotals[`${row}-${field}-${aggregation}`] = calculate(allValues, aggregation);
+        const allValues = colKeys.flatMap(col => pivot[rowKey]?.[col]?.[field] || []);
+        rowTotals[`${rowKey}-${field}-${aggregation}`] = calculate(allValues, aggregation);
       });
     });
 
-    // Calculate grand totals by aggregating all raw values from all rows and columns for each measure
     const grandTotals = {};
     measures.forEach(({ field, aggregation }) => {
-      const allValues = rowKeys.flatMap(row => colKeys.flatMap(col => pivot[row]?.[col]?.[field] || []));
+      const allValues = rowKeyPartsList.flatMap(rowParts =>
+        colKeys.flatMap(col => pivot[rowParts.join('|')]?.[col]?.[field] || [])
+      );
       grandTotals[`${field}-${aggregation}`] = calculate(allValues, aggregation);
     });
 
-    return { pivot, rowKeys, colKeys, columnTotals, rowTotals, grandTotals };
+    return { pivot, rowKeyPartsList, colKeys, columnTotals, rowTotals, grandTotals };
   }, [data, rowFields, columnFields, measures]);
 
-  const colKeyParts = colKeys.map(col => col.split(' | '));
-  const levels = columnFields.length;
+  const colKeyParts = colKeys.map(col => col.split('|'));
+  const columnLevels = columnFields.length;
+  const rowLevels = rowFields.length;
 
-  // Create header rows for hierarchical columns
+  // Fixed: Calculate row spans for hierarchical row headers
+  const getRowHeaderCells = (rows) => {
+    const spans = Array(rows.length).fill(null).map(() => Array(rowLevels).fill(0));
+
+    for (let level = 0; level < rowLevels; level++) {
+      let startIndex = 0;
+      for (let i = 1; i <= rows.length; i++) {
+        if (
+          i === rows.length ||
+          rows[i][level] !== rows[i - 1][level] ||
+          // Also check if any higher-level field differs — prevents merging across groups
+          (level > 0 && rows[i][level - 1] !== rows[i - 1][level - 1])
+        ) {
+          const spanLength = i - startIndex;
+          spans[startIndex][level] = spanLength;
+          // All others in this group get 0 to skip rendering
+          for (let j = startIndex + 1; j < i; j++) {
+            spans[j][level] = 0;
+          }
+          startIndex = i;
+        }
+      }
+    }
+    return spans;
+  };
+
+  const rowHeaderSpans = getRowHeaderCells(rowKeyPartsList);
+
+  // Column headers
   const headerRows = [];
-  for (let level = 0; level < levels; level++) {
+  for (let level = 0; level < columnLevels; level++) {
     let cells = [];
     let lastLabel = null;
     let spanStart = 0;
@@ -109,37 +150,43 @@ const PivotTable = ({ data, rowFields, columnFields, measures }) => {
   );
 
   return (
-    <div style={{ maxHeight: '600px', overflowY: 'auto', overflowX: 'auto' }}>
+    <div style={{ maxHeight: '600px', overflow: 'auto' }}>
       <table border={1} cellPadding={5} style={{ borderCollapse: 'collapse', width: '100%' }}>
         <thead style={{ position: 'sticky', top: 0, backgroundColor: '#fff', zIndex: 10 }}>
           {headerRows.map((row, level) => (
             <tr key={`header-level-${level}`}>
-              {level === 0 && (
-                <th
-                  rowSpan={levels + 1}
-                  style={{ backgroundColor: '#e0e0e0', position: 'sticky', left: 0, zIndex: 11 }}
-                >
-                  <FontAwesomeIcon icon={faArrowsAltH} /> {rowFields.join(' / ')}
-                </th>
-              )}
+              {level === 0 &&
+                rowFields.map((field, i) =>
+                  i === 0 ? (
+                    <th
+                      key={`row-head-${i}`}
+                      rowSpan={columnLevels + 1}
+                      style={{ backgroundColor: '#e0e0e0', position: 'sticky', left: 0, zIndex: 11 }}
+                    >
+                      <FontAwesomeIcon icon={faArrowsAltH} /> {field}
+                    </th>
+                  ) : (
+                    <th
+                      key={`row-head-${i}`}
+                      rowSpan={columnLevels + 1}
+                      style={{ backgroundColor: '#e0e0e0', position: 'sticky', left: 0, zIndex: 11 }}
+                    >
+                      {field}
+                    </th>
+                  )
+                )}
               {row.map((cell, i) => (
-                <th
-                  key={`header-${level}-${i}`}
-                  colSpan={cell.colSpan}
-                  style={{ backgroundColor: '#e0e0e0' }}
-                >
+                <th key={`header-${level}-${i}`} colSpan={cell.colSpan} style={{ backgroundColor: '#e0e0e0' }}>
                   {cell.label} <FontAwesomeIcon icon={faColumns} />
                 </th>
               ))}
               {level === 0 && (
-                <th rowSpan={levels + 1} style={{ backgroundColor: '#f0f0f0' }}>
+                <th rowSpan={columnLevels + 1} style={{ backgroundColor: '#f0f0f0' }}>
                   Row Total <FontAwesomeIcon icon={faPlus} />
                 </th>
               )}
             </tr>
           ))}
-
-          {/* Measure row */}
           <tr>
             {measureHeaderRow.map(({ label, key }) => (
               <th key={key} style={{ fontSize: '12px', backgroundColor: '#f9f9f9' }}>
@@ -150,17 +197,37 @@ const PivotTable = ({ data, rowFields, columnFields, measures }) => {
         </thead>
 
         <tbody>
-          {rowKeys.map(row => {
+          {rowKeyPartsList.map((rowParts, rowIndex) => {
+            const rowKey = rowParts.join('|');
             return (
-              <tr key={row}>
-                <td style={{ backgroundColor: '#f9f9f9', fontWeight: 'bold', position: 'sticky', left: 0 }}>
-                  {row}
-                </td>
+              <tr key={rowKey}>
+                {rowParts.map((part, i) => {
+                  const span = rowHeaderSpans[rowIndex][i];
+                  if (span > 0) {
+                    return (
+                      <td
+                        key={`row-header-${rowIndex}-${i}`}
+                        rowSpan={span}
+                        style={{
+                          backgroundColor: '#f9f9f9',
+                          fontWeight: 'bold',
+                          position: 'sticky',
+                          left: i === 0 ? 0 : 'auto', // only first col sticky
+                          zIndex: 1,
+                          minWidth: 100,
+                        }}
+                      >
+                        {part}
+                      </td>
+                    );
+                  }
+                  return null;
+                })}
                 {colKeys.map(col =>
                   measures.map(m => {
-                    const values = pivot[row]?.[col]?.[m.field] || [];
+                    const values = pivot[rowKey]?.[col]?.[m.field] || [];
                     return (
-                      <td key={`${row}-${col}-${m.field}-${m.aggregation}`}>
+                      <td key={`${rowKey}-${col}-${m.field}-${m.aggregation}`}>
                         {calculate(values, m.aggregation)}
                       </td>
                     );
@@ -168,8 +235,8 @@ const PivotTable = ({ data, rowFields, columnFields, measures }) => {
                 )}
                 <td style={{ backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
                   {measures.map(m => (
-                    <div key={`row-total-${row}-${m.field}`}>
-                      {rowTotals[`${row}-${m.field}-${m.aggregation}`]}
+                    <div key={`row-total-${rowKey}-${m.field}`}>
+                      {rowTotals[`${rowKey}-${m.field}-${m.aggregation}`]}
                     </div>
                   ))}
                 </td>
@@ -180,7 +247,10 @@ const PivotTable = ({ data, rowFields, columnFields, measures }) => {
 
         <tfoot>
           <tr>
-            <td style={{ backgroundColor: '#f0f0f0', fontWeight: 'bold', position: 'sticky', left: 0 }}>
+            <td
+              colSpan={rowFields.length}
+              style={{ backgroundColor: '#f0f0f0', fontWeight: 'bold', position: 'sticky', left: 0 }}
+            >
               Column Totals <FontAwesomeIcon icon={faPlus} />
             </td>
             {colKeys.map(col =>
@@ -195,9 +265,7 @@ const PivotTable = ({ data, rowFields, columnFields, measures }) => {
             )}
             <td style={{ backgroundColor: '#e0e0e0', fontWeight: 'bold' }}>
               {measures.map(m => (
-                <div key={`grand-total-${m.field}`}>
-                  {grandTotals[`${m.field}-${m.aggregation}`]}
-                </div>
+                <div key={`grand-total-${m.field}`}>{grandTotals[`${m.field}-${m.aggregation}`]}</div>
               ))}
             </td>
           </tr>

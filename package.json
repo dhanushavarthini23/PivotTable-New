@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "deploy":"git add . && git commit -m 'update' && git push"
+    "deploy": "git add . && git commit -m 'update' && git push"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -20,6 +20,7 @@
     "@mui/material": "^7.0.2",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.503.0",
+    "papaparse": "^5.5.3",
     "react": "^18.3.1",
     "react-beautiful-dnd": "^13.1.1",
     "react-dnd": "^16.0.1",

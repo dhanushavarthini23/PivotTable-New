@@ -1,48 +1,33 @@
 import React, { useState } from 'react';
-import './CSVUploader.css'; // Make sure path is correct
+import './CSVUploader.css'; 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFileUpload } from '@fortawesome/free-solid-svg-icons';
+import Papa from 'papaparse';
 
 const CSVUploader = ({ onUpload }) => {
   const [uploadStatus, setUploadStatus] = useState('');
   const [messageType, setMessageType] = useState('');
 
-  const parseCSV = (text) => {
-    const [headerLine, ...lines] = text.trim().split('\n');
-    const headers = headerLine.split(',');
-  
-    // Iterate through each line and process the data
-    return lines.map(line => {
-      const values = line.split(',');
-  
-      // Create a new object based on headers and values
-      const rowData = headers.reduce((acc, h, i) => {
-        const value = values[i];
-  
-        // Check if the value is a valid date and process the Year, Month, and Day
+  const isValidDate = (dateString) => {
+    const regex = /^\d{4}-\d{2}-\d{2}$/; // YYYY-MM-DD
+    return regex.test(dateString);
+  };
+
+  const processData = (parsedData) => {
+    return parsedData.map(row => {
+      const newRow = { ...row };
+      for (const key in row) {
+        const value = row[key];
         if (isValidDate(value)) {
           const date = new Date(value);
-          acc[`${h}_Year`] = date.getFullYear();
-          acc[`${h}_Month`] = date.getMonth() + 1; // Month is 0-based
-          acc[`${h}_Day`] = date.getDate();
+          newRow[`${key}_Year`] = date.getFullYear();
+          newRow[`${key}_Month`] = date.getMonth() + 1;
+          newRow[`${key}_Day`] = date.getDate();
         }
-        
-        // Keep the original date field
-        acc[h] = value;
-  
-        return acc;
-      }, {});
-  
-      return rowData;
+      }
+      return newRow;
     });
   };
-  
-  // Helper function to check if a value is a valid date
-  const isValidDate = (dateString) => {
-    const regex = /^\d{4}-\d{2}-\d{2}$/;  // Match format YYYY-MM-DD
-    return dateString.match(regex) !== null;
-  };
-  
 
   const handleChange = (e) => {
     const file = e.target.files[0];
@@ -55,18 +40,21 @@ const CSVUploader = ({ onUpload }) => {
 
       setUploadStatus('Uploading...');
       setMessageType('');
-      const reader = new FileReader();
-      reader.onload = () => {
-        const data = parseCSV(reader.result);
-        onUpload(data);
-        setUploadStatus('Upload successful!');
-        setMessageType('success');
-      };
-      reader.onerror = () => {
-        setUploadStatus('Error: Could not read file.');
-        setMessageType('error');
-      };
-      reader.readAsText(file);
+
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          const processed = processData(results.data);
+          onUpload(processed);
+          setUploadStatus('Upload successful!');
+          setMessageType('success');
+        },
+        error: () => {
+          setUploadStatus('Error: Could not parse the file.');
+          setMessageType('error');
+        }
+      });
     }
   };
 
